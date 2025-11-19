@@ -157,9 +157,11 @@ impl OrderBuilder {
                 let raw_taker_amt = size.round_dp_with_strategy(round_config.size, ToZero);
                 let raw_maker_amt = raw_taker_amt * raw_price;
                 let raw_maker_amt = self.fix_amount_rounding(raw_maker_amt, round_config);
+                let (maker_amt, taker_amt) =
+                    Self::clamp_amount_precision(Side::BUY, raw_maker_amt, raw_taker_amt);
                 (
-                    decimal_to_token_u32(raw_maker_amt),
-                    decimal_to_token_u32(raw_taker_amt),
+                    decimal_to_token_u32(maker_amt),
+                    decimal_to_token_u32(taker_amt),
                 )
             }
             Side::SELL => {
@@ -167,9 +169,12 @@ impl OrderBuilder {
                 let raw_taker_amt = raw_maker_amt * raw_price;
                 let raw_taker_amt = self.fix_amount_rounding(raw_taker_amt, round_config);
 
+                let (maker_amt, taker_amt) =
+                    Self::clamp_amount_precision(Side::SELL, raw_maker_amt, raw_taker_amt);
+
                 (
-                    decimal_to_token_u32(raw_maker_amt),
-                    decimal_to_token_u32(raw_taker_amt),
+                    decimal_to_token_u32(maker_amt),
+                    decimal_to_token_u32(taker_amt),
                 )
             }
         }
@@ -188,12 +193,29 @@ impl OrderBuilder {
 
         let raw_taker_amt = self.fix_amount_rounding(raw_taker_amt, round_config);
 
+        let (maker_amt, taker_amt) =
+            Self::clamp_amount_precision(Side::BUY, raw_maker_amt, raw_taker_amt);
+
         (
-            decimal_to_token_u32(raw_maker_amt),
-            decimal_to_token_u32(raw_taker_amt),
+            decimal_to_token_u32(maker_amt),
+            decimal_to_token_u32(taker_amt),
         )
     }
 
+    fn clamp_amount_precision(side: Side, maker: Decimal, taker: Decimal) -> (Decimal, Decimal) {
+        match side {
+            // BUY: maker is quote (USD) -> 2dp, taker is base -> 4dp
+            Side::BUY => (
+                maker.round_dp_with_strategy(2, MidpointTowardZero),
+                taker.round_dp_with_strategy(4, MidpointTowardZero),
+            ),
+            // SELL: maker is base -> 4dp, taker is quote (USD) -> 2dp
+            Side::SELL => (
+                maker.round_dp_with_strategy(4, MidpointTowardZero),
+                taker.round_dp_with_strategy(2, MidpointTowardZero),
+            ),
+        }
+    }
     pub fn calculate_market_price(
         &self,
         positions: &[OrderSummary],
