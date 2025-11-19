@@ -1,5 +1,5 @@
 use alloy_primitives::hex::encode_prefixed;
-pub use alloy_primitives::U256;
+pub use alloy_primitives::{Address, U256};
 use alloy_signer_local::PrivateKeySigner;
 pub use anyhow::{anyhow, Context, Result as ClientResult};
 use config::get_contract_config;
@@ -26,6 +26,7 @@ mod utils;
 pub use data::*;
 pub use eth_utils::EthSigner;
 use headers::{create_l1_headers, create_l2_headers};
+pub use orders::SigType;
 
 #[derive(Default)]
 pub struct ClobClient {
@@ -35,6 +36,33 @@ pub struct ClobClient {
     chain_id: Option<u64>,
     api_creds: Option<ApiCreds>,
     order_builder: Option<OrderBuilder>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct ClientSignerConfig {
+    pub signature_type: SigType,
+    pub funder: Option<Address>,
+}
+
+impl Default for ClientSignerConfig {
+    fn default() -> Self {
+        Self {
+            signature_type: SigType::Eoa,
+            funder: None,
+        }
+    }
+}
+
+impl ClientSignerConfig {
+    pub fn with_signature_type(mut self, signature_type: SigType) -> Self {
+        self.signature_type = signature_type;
+        self
+    }
+
+    pub fn with_funder(mut self, funder: Address) -> Self {
+        self.funder = Some(funder);
+        self
+    }
 }
 
 const INITIAL_CURSOR: &str = "MA==";
@@ -50,33 +78,68 @@ impl ClobClient {
         }
     }
     pub fn with_l1_headers(host: &str, key: &str, chain_id: u64) -> Self {
+        Self::with_l1_headers_config(host, key, chain_id, ClientSignerConfig::default())
+    }
+
+    pub fn with_l1_headers_config(
+        host: &str,
+        key: &str,
+        chain_id: u64,
+        config: ClientSignerConfig,
+    ) -> Self {
         let signer = Box::new(
             key.parse::<PrivateKeySigner>()
                 .expect("Invalid private key"),
         );
+        let order_builder = Self::build_order_builder(&signer, config);
         Self {
             host: host.to_owned(),
             http_client: Client::new(),
-            signer: Some(signer.clone()),
+            signer: Some(signer),
             chain_id: Some(chain_id),
             api_creds: None,
-            order_builder: Some(OrderBuilder::new(signer, None, None)),
+            order_builder: Some(order_builder),
         }
     }
 
     pub fn with_l2_headers(host: &str, key: &str, chain_id: u64, api_creds: ApiCreds) -> Self {
+        Self::with_l2_headers_config(
+            host,
+            key,
+            chain_id,
+            api_creds,
+            ClientSignerConfig::default(),
+        )
+    }
+
+    pub fn with_l2_headers_config(
+        host: &str,
+        key: &str,
+        chain_id: u64,
+        api_creds: ApiCreds,
+        config: ClientSignerConfig,
+    ) -> Self {
         let signer = Box::new(
             key.parse::<PrivateKeySigner>()
                 .expect("Invalid private key"),
         );
+        let order_builder = Self::build_order_builder(&signer, config);
         Self {
             host: host.to_owned(),
             http_client: Client::new(),
-            signer: Some(signer.clone()),
+            signer: Some(signer),
             chain_id: Some(chain_id),
             api_creds: Some(api_creds),
-            order_builder: Some(OrderBuilder::new(signer, None, None)),
+            order_builder: Some(order_builder),
         }
+    }
+
+    fn build_order_builder(
+        signer: &Box<PrivateKeySigner>,
+        config: ClientSignerConfig,
+    ) -> OrderBuilder {
+        let funder = config.funder.unwrap_or_else(|| signer.address());
+        OrderBuilder::new(signer.clone(), Some(config.signature_type), Some(funder))
     }
     pub fn set_api_creds(&mut self, api_creds: ApiCreds) {
         self.api_creds = Some(api_creds);
@@ -882,7 +945,10 @@ impl ClobClient {
             .await?)
     }
 
-    pub async fn get_sampling_markets(&self, next_cursor: Option<&str>) -> ClientResult<MarketsResponse> {
+    pub async fn get_sampling_markets(
+        &self,
+        next_cursor: Option<&str>,
+    ) -> ClientResult<MarketsResponse> {
         let next_cursor = next_cursor.unwrap_or(INITIAL_CURSOR);
 
         Ok(self

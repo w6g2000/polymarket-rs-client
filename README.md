@@ -69,3 +69,36 @@ async fn main() {
 ```
 
 The `ClobClient` implements the same API as the [official python client](https://github.com/Polymarket/py-clob-client). All available functions are listed in the [docs](https://docs.rs/polymarket-rs-client/latest/polymarket_rs_client/struct.ClobClient.html).
+
+### Using proxy / non-EOA wallets
+
+The signature types match the official Python/TS clients:
+
+- `SigType::Eoa` = 0 (default)
+- `SigType::EmailOrMagic` = 1
+- `SigType::BrowserWalletProxy` = 2 (proxy funds live here)
+- `SigType::GnosisSafe` = 3
+
+You can pass a funder (proxy) address and signature type when constructing the client:
+
+```rust
+use polymarket_rs_client::{
+    Address, ApiCreds, ClobClient, ClientSignerConfig, SigType,
+};
+use std::str::FromStr;
+
+let proxy_address = Address::from_str("0xYourProxyAddressHere")
+    .expect("invalid proxy address");
+
+let config = ClientSignerConfig::default()
+    .with_signature_type(SigType::BrowserWalletProxy)
+    .with_funder(proxy_address);
+
+let client = ClobClient::with_l2_headers_config(
+    HOST,
+    &private_key,
+    POLYGON,
+    api_creds,
+    config,
+);
+```

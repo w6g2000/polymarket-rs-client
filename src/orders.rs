@@ -21,14 +21,17 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::LazyLock;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
+#[repr(u8)]
 pub enum SigType {
-    // ECDSA EIP712 signatures signed by EOAs
+    /// ECDSA EIP712 signatures signed by EOAs (default)
     Eoa = 0,
-    // EIP712 signatures signed by EOAs that own Polymarket Proxy wallets
-    PolyProxy = 1,
-    // EIP712 signatures signed by EOAs that own Polymarket Gnosis safes
-    PolyGnosisSafe = 2,
+    /// Email/Magic wallet signatures (py/TS signature_type = 1)
+    EmailOrMagic = 1,
+    /// Browser wallet proxy / Polymarket proxy wallet (py/TS signature_type = 2)
+    BrowserWalletProxy = 2,
+    /// Gnosis safe backed Polymarket wallets
+    GnosisSafe = 3,
 }
 
 pub struct OrderBuilder {
