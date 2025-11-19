@@ -181,7 +181,8 @@ impl ClobClient {
         let method = Method::GET;
         let endpoint = "/auth/api-keys";
         let (signer, creds) = self.get_l2_parameters();
-        let headers = create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
+        let (headers, _) =
+            create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
 
         let req = self.create_request_with_headers(method, endpoint, headers.into_iter());
 
@@ -192,7 +193,8 @@ impl ClobClient {
         let method = Method::DELETE;
         let endpoint = "/auth/api-key";
         let (signer, creds) = self.get_l2_parameters();
-        let headers = create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
+        let (headers, _) =
+            create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
         let req = self.create_request_with_headers(method, endpoint, headers.into_iter());
 
         Ok(req.send().await?.text().await?)
@@ -494,11 +496,21 @@ impl ClobClient {
         let method = Method::POST;
         let endpoint = "/order";
 
-        let headers = create_l2_headers(signer, creds, method.as_str(), endpoint, Some(&body))?;
+        let (headers, body_str) =
+            create_l2_headers(signer, creds, method.as_str(), endpoint, Some(&body))?;
 
         let req = self.create_request_with_headers(method, endpoint, headers.into_iter());
 
-        Ok(req.json(&body).send().await?.json::<Value>().await?)
+        // body_str is Some because we passed Some(&body)
+        let body_str = body_str.expect("body string missing for post_order");
+
+        Ok(req
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(body_str)
+            .send()
+            .await?
+            .json::<Value>()
+            .await?)
     }
 
     pub async fn create_and_post_order(&self, order_args: &OrderArgs) -> ClientResult<Value> {
@@ -513,11 +525,20 @@ impl ClobClient {
         let method = Method::DELETE;
         let endpoint = "/order";
 
-        let headers = create_l2_headers(signer, creds, method.as_str(), endpoint, Some(&body))?;
+        let (headers, body_str) =
+            create_l2_headers(signer, creds, method.as_str(), endpoint, Some(&body))?;
 
         let req = self.create_request_with_headers(method, endpoint, headers.into_iter());
 
-        Ok(req.json(&body).send().await?.json::<Value>().await?)
+        let body_str = body_str.expect("body string missing for cancel");
+
+        Ok(req
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(body_str)
+            .send()
+            .await?
+            .json::<Value>()
+            .await?)
     }
 
     pub async fn cancel_orders(&self, order_ids: &[String]) -> ClientResult<Value> {
@@ -525,11 +546,19 @@ impl ClobClient {
         let method = Method::DELETE;
         let endpoint = "/orders";
 
-        let headers = create_l2_headers(signer, creds, method.as_str(), endpoint, Some(order_ids))?;
+        let (headers, body_str) =
+            create_l2_headers(signer, creds, method.as_str(), endpoint, Some(order_ids))?;
 
         let req = self.create_request_with_headers(method, endpoint, headers.into_iter());
+        let body_str = body_str.expect("body string missing for cancel_orders");
 
-        Ok(req.json(order_ids).send().await?.json::<Value>().await?)
+        Ok(req
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(body_str)
+            .send()
+            .await?
+            .json::<Value>()
+            .await?)
     }
 
     pub async fn cancel_all(&self) -> ClientResult<Value> {
@@ -537,7 +566,8 @@ impl ClobClient {
         let method = Method::DELETE;
         let endpoint = "/cancel-all";
 
-        let headers = create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
+        let (headers, _) =
+            create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
 
         let req = self.create_request_with_headers(method, endpoint, headers.into_iter());
 
@@ -557,11 +587,19 @@ impl ClobClient {
             ("asset_id", asset_id.unwrap_or("")),
         ]);
 
-        let headers = create_l2_headers(signer, creds, method.as_str(), endpoint, Some(&body))?;
+        let (headers, body_str) =
+            create_l2_headers(signer, creds, method.as_str(), endpoint, Some(&body))?;
 
         let req = self.create_request_with_headers(method, endpoint, headers.into_iter());
+        let body_str = body_str.expect("body string missing for cancel_market_orders");
 
-        Ok(req.json(&body).send().await?.json::<Value>().await?)
+        Ok(req
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(body_str)
+            .send()
+            .await?
+            .json::<Value>()
+            .await?)
     }
 
     pub async fn get_orders(
@@ -572,7 +610,8 @@ impl ClobClient {
         let (signer, creds) = self.get_l2_parameters();
         let method = Method::GET;
         let endpoint = "/data/orders";
-        let headers = create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
+        let (headers, _) =
+            create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
 
         let query_params = match params {
             None => Vec::new(),
@@ -614,7 +653,8 @@ impl ClobClient {
         let method = Method::GET;
         let endpoint = &format!("/data/order/{order_id}");
 
-        let headers = create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
+        let (headers, _) =
+            create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
 
         let req = self.create_request_with_headers(method, endpoint, headers.into_iter());
 
@@ -656,7 +696,8 @@ impl ClobClient {
         let (signer, creds) = self.get_l2_parameters();
         let method = Method::GET;
         let endpoint = "/data/trades";
-        let headers = create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
+        let (headers, _) =
+            create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
 
         let query_params = match trade_params {
             None => Vec::new(),
@@ -697,7 +738,8 @@ impl ClobClient {
 
         let method = Method::GET;
         let endpoint = "/notifications";
-        let headers = create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
+        let (headers, _) =
+            create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
 
         let req = self.create_request_with_headers(method, endpoint, headers.into_iter());
 
@@ -721,7 +763,8 @@ impl ClobClient {
 
         let method = Method::DELETE;
         let endpoint = "/notifications";
-        let headers = create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
+        let (headers, _) =
+            create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
 
         let req = self.create_request_with_headers(method, endpoint, headers.into_iter());
 
@@ -753,7 +796,8 @@ impl ClobClient {
 
         let method = Method::GET;
         let endpoint = "/balance-allowance";
-        let headers = create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
+        let (headers, _) =
+            create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
 
         let req = self.create_request_with_headers(method, endpoint, headers.into_iter());
         Ok(req
@@ -784,7 +828,8 @@ impl ClobClient {
 
         let method = Method::GET;
         let endpoint = "/balance-allowance/update";
-        let headers = create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
+        let (headers, _) =
+            create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
 
         let req = self.create_request_with_headers(method, endpoint, headers.into_iter());
         Ok(req
@@ -800,7 +845,8 @@ impl ClobClient {
 
         let method = Method::GET;
         let endpoint = "/order-scoring";
-        let headers = create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
+        let (headers, _) =
+            create_l2_headers::<Value>(signer, creds, method.as_str(), endpoint, None)?;
         let req = self.create_request_with_headers(method, endpoint, headers.into_iter());
 
         Ok(req
@@ -822,11 +868,14 @@ impl ClobClient {
         let method = Method::POST;
         let endpoint = "/orders-scoring";
 
-        let headers = create_l2_headers(signer, creds, method.as_str(), endpoint, Some(order_ids))?;
+        let (headers, body_str) =
+            create_l2_headers(signer, creds, method.as_str(), endpoint, Some(order_ids))?;
         let req = self.create_request_with_headers(method, endpoint, headers.into_iter());
+        let body_str = body_str.expect("body string missing for orders_scoring");
 
         Ok(req
-            .json(order_ids)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(body_str)
             .send()
             .await?
             .json::<HashMap<String, bool>>()

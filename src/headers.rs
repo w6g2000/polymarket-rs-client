@@ -1,5 +1,5 @@
 use crate::eth_utils::{sign_clob_auth_message, EthSigner};
-use crate::utils::{build_hmac_signature, get_current_unix_time_secs};
+use crate::utils::{build_hmac_signature_from_str, format_hmac_body, get_current_unix_time_secs};
 use crate::ApiCreds;
 use alloy_primitives::hex::encode_prefixed;
 use alloy_primitives::U256;
@@ -37,21 +37,34 @@ pub fn create_l2_headers<T>(
     method: &str,
     req_path: &str,
     body: Option<&T>,
-) -> Result<Headers>
+) -> Result<(Headers, Option<String>)>
 where
     T: ?Sized + Serialize,
 {
     let address = encode_prefixed(signer.address().as_slice());
     let timestamp = get_current_unix_time_secs();
 
-    let hmac_signature =
-        build_hmac_signature(&api_creds.secret, timestamp, method, req_path, body)?;
+    let body_str = match body {
+        None => None,
+        Some(b) => Some(format_hmac_body(b)?),
+    };
 
-    Ok(HashMap::from([
-        (POLY_ADDR_HEADER, address),
-        (POLY_SIG_HEADER, hmac_signature),
-        (POLY_TS_HEADER, timestamp.to_string()),
-        (POLY_API_KEY_HEADER, api_creds.api_key.clone()),
-        (POLY_PASS_HEADER, api_creds.passphrase.clone()),
-    ]))
+    let hmac_signature = build_hmac_signature_from_str(
+        &api_creds.secret,
+        timestamp,
+        method,
+        req_path,
+        body_str.as_deref(),
+    )?;
+
+    Ok((
+        HashMap::from([
+            (POLY_ADDR_HEADER, address),
+            (POLY_SIG_HEADER, hmac_signature),
+            (POLY_TS_HEADER, timestamp.to_string()),
+            (POLY_API_KEY_HEADER, api_creds.api_key.clone()),
+            (POLY_PASS_HEADER, api_creds.passphrase.clone()),
+        ]),
+        body_str,
+    ))
 }

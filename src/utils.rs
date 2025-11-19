@@ -26,19 +26,26 @@ pub fn build_hmac_signature<T>(
 where
     T: ?Sized + Serialize,
 {
+    let body = match body {
+        None => None,
+        Some(b) => Some(format_hmac_body(b)?),
+    };
+    build_hmac_signature_from_str(secret, timestamp, method, req_path, body.as_deref())
+}
+
+pub fn build_hmac_signature_from_str(
+    secret: &str,
+    timestamp: u64,
+    method: &str,
+    req_path: &str,
+    body: Option<&str>,
+) -> Result<String> {
     let decoded = URL_SAFE
         .decode(secret)
         .context("Can't decode secret to base64")?;
     let message = match body {
         None => format!("{timestamp}{method}{req_path}"),
-        Some(s) => {
-            // We format like str(dict) in python
-            let s = JsonFormat::new()
-                .comma(", ")?
-                .colon(": ")?
-                .format_to_string(&s)?;
-            format!("{timestamp}{method}{req_path}{s}")
-        }
+        Some(s) => format!("{timestamp}{method}{req_path}{s}"),
     };
 
     let mut mac = HmacSha256::new_from_slice(&decoded).context("HMAC init error")?;
@@ -47,6 +54,16 @@ where
     let result = mac.finalize();
 
     Ok(URL_SAFE.encode(&result.into_bytes()[..]))
+}
+
+pub fn format_hmac_body<T>(body: &T) -> Result<String>
+where
+    T: ?Sized + Serialize,
+{
+    Ok(JsonFormat::new()
+        .comma(", ")?
+        .colon(": ")?
+        .format_to_string(body)?)
 }
 
 #[cfg(test)]
